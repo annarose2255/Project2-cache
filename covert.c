@@ -179,13 +179,16 @@ char spy()
     uint64_t penalty;
     for (i = 0; i < L1_NUM_SETS; i++) //goes through, and takes time measurements; at the set affected by the trojan, will parse manipulated cache, resulting in longer runtime
     {
-        uint64_t before = rdstc();
+        //CPUID();
+        uint64_t before = __rdtsc();
+        //CPUID();
         eviction_set_addr = get_eviction_set_address(spy_array, i, 0);
         for(j = 1; j < ASSOCIATIVITY; j++) //probe linked lists of cache sets
         {
             eviction_set_addr = (uint64_t *)*eviction_set_addr;
         }
-        penalty = rdstc() - before;
+        //CPUID();
+        penalty = __rdtsc() - before;
         if(penalty > max_penalty)
         {
             max_set = i;
