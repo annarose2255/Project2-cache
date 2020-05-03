@@ -96,7 +96,7 @@ uint64_t* get_eviction_set_address(uint64_t *base, int set, int way)
  * i.e., way-0 -> way-1 -> ..... way-7 -> NULL
  *
  */
-void setup(uint64_t *base, int assoc)
+void setup(uint64_t *base, int assoc) // exploits spatial and temporal locality
 {
     uint64_t i, j;
     uint64_t *eviction_set_addr; //stores an address
@@ -148,8 +148,7 @@ void trojan(char byte)
 
     eviction_set_addr = get_eviction_set_address(spy_array, set, 0); //gets the beginning address of the cache set in spy array
     trojan_cache_addr = get_eviction_set_address(trojan_array, set, 0);
-    *eviction_set_addr = trojan_cache_addr; //set spy array's cache set to trojan array's dummy cache set 
-
+    *eviction_set_addr = (uint64_t) trojan_cache_addr; //set spy array's cache set to trojan array's dummy cache set
 }
 
 /* TODO:
@@ -171,22 +170,22 @@ void trojan(char byte)
  */
 char spy()
 {
-    int i, max_set;
+    int i, j, max_set;
     uint64_t *eviction_set_addr;
 
-    // Probe the cache line by line and take measurements using RDTSC
+    // Probe the cache line by line and take measurements
     max_set = 0;
     uint64_t max_penalty = 0;
     uint64_t penalty;
     for (i = 0; i < L1_NUM_SETS; i++) //goes through, and takes time measurements; at the set affected by the trojan, will parse manipulated cache, resulting in longer runtime
     {
-        uint64_t before = RDTSC();
+        uint64_t before = rdstc();
         eviction_set_addr = get_eviction_set_address(spy_array, i, 0);
         for(j = 1; j < ASSOCIATIVITY; j++) //probe linked lists of cache sets
         {
-            eviction_set_addr = *eviction_set_addr;
+            eviction_set_addr = (uint64_t *)*eviction_set_addr;
         }
-        penalty = RDTSC() - before;
+        penalty = rdstc() - before;
         if(penalty > max_penalty)
         {
             max_set = i;
