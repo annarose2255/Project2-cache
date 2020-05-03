@@ -20,7 +20,7 @@
 // Intrinsic CLFLUSH for FLUSH+RELOAD attack
 #define CLFLUSH(address) _mm_clflush(address);
 
-#define SAMPLES 10000 // TODO: CONFIGURE THIS
+#define SAMPLES 20 // TODO: CONFIGURE THIS
 
 #define L1_CACHE_SIZE (32*1024)
 #define LINE_SIZE 64
@@ -186,21 +186,34 @@ char spy()
         RDTSC(start);
         //CPUID();
         eviction_set_addr = get_eviction_set_address(spy_array, i, 0);
-        for(j = 1; j < ASSOCIATIVITY; j++) //probe linked lists of cache sets
-        {
-            eviction_set_addr = (uint64_t *)*eviction_set_addr;
-        }
-        CPUID();
         RDTSC(end);
         if (end > start){
             penalty = end - start;
         }
-       // penalty = __rdtsc() - before;
         if(penalty > max_penalty)
         {
             max_set = i;
             max_penalty = penalty;
+            //printf("t");
         }
+        for(j = 1; j < ASSOCIATIVITY; j++) //probe linked lists of cache sets
+        {
+            CPUID();
+            RDTSC(start);
+            eviction_set_addr = (uint64_t *)*eviction_set_addr;
+            RDTSC(end);
+            if (end > start){
+                penalty = end - start;
+            }
+            if(penalty > max_penalty){
+                max_set = i;
+                max_penalty = penalty;
+               //printf("h");
+            }
+        }
+       // penalty = __rdtsc() - before;
+        
+         //printf("%d",i);
     }
     eviction_counts[max_set]++;
 }
@@ -227,10 +240,12 @@ int main()
         for (k = 0; k < SAMPLES; k++) {
           trojan(msg); 
           spy(); // sets eviction counts?
+        printf("i");
         }
         for (j = 0; j < L1_NUM_SETS; j++) { // finds the set with the longest eviction time = more cache misses
             if (eviction_counts[j] > max_count) {
                 max_count = eviction_counts[j];
+                printf("a");
                 max_set = j;
             }
             eviction_counts[j] = 0; //reset the counts
