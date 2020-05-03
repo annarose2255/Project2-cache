@@ -172,6 +172,8 @@ char spy()
 {
     int i, j, max_set;
     uint64_t *eviction_set_addr;
+    uint64_t start = 0;
+    uint64_t end = 0;
 
     // Probe the cache line by line and take measurements
     max_set = 0;
@@ -179,16 +181,21 @@ char spy()
     uint64_t penalty;
     for (i = 0; i < L1_NUM_SETS; i++) //goes through, and takes time measurements; at the set affected by the trojan, will parse manipulated cache, resulting in longer runtime
     {
-        //CPUID();
-        uint64_t before = __rdtsc();
+        CPUID();
+        //uint64_t before = RDTSC((uint64_t) i);
+        RDTSC(start);
         //CPUID();
         eviction_set_addr = get_eviction_set_address(spy_array, i, 0);
         for(j = 1; j < ASSOCIATIVITY; j++) //probe linked lists of cache sets
         {
             eviction_set_addr = (uint64_t *)*eviction_set_addr;
         }
-        //CPUID();
-        penalty = __rdtsc() - before;
+        CPUID();
+        RDTSC(end);
+        if (end > start){
+            penalty = end - start;
+        }
+       // penalty = __rdtsc() - before;
         if(penalty > max_penalty)
         {
             max_set = i;
