@@ -99,14 +99,14 @@ uint64_t* get_eviction_set_address(uint64_t *base, int set, int way)
 void setup(uint64_t *base, int assoc)
 {
     uint64_t i, j;
-    uint64_t *eviction_set_addr;
+    uint64_t *eviction_set_addr; //stores an address
 
-    // Prime the cache set by set (i.e., prime all lines in a set)
+    // Prime the cache set by set (i.e., prime all lines in a set) so basically at address for way-0, it stores the address for way-1; address at way-1 stores address for way-2...
     for (i = 0; i < L1_NUM_SETS; i++) { //parses from set to set
-        eviction_set_addr = get_eviction_set_address(base, i, 0);
+        eviction_set_addr = get_eviction_set_address(base, i, 0); //eviction_set_addr stores the address at the beginning of the set
         for (j = 1; j < assoc; j++) { //parses from cache line to cache line within the set
-            *eviction_set_addr = (uint64_t)get_eviction_set_address(base, i, j);
-            eviction_set_addr = (uint64_t *)*eviction_set_addr;
+            *eviction_set_addr = (uint64_t)get_eviction_set_address(base, i, j); //at the memory location of the address at base, store the eviction set address
+            eviction_set_addr = (uint64_t *)*eviction_set_addr; //make the eviction_set_addr point to this new eviction set address just found
         }
         *eviction_set_addr = 0;
     }
@@ -118,7 +118,7 @@ void setup(uint64_t *base, int assoc)
  * to the spy over the cache covert channel.  Note that the
  * message forgoes case sensitivity to maximize the covert
  * channel bandwidth.
- *
+ *,
  * Your job is to use the right eviction set to mount an
  * appropriate PRIME+PROBE or FLUSH+RELOAD covert channel
  * attack.  Remember that in both these attacks, we only need
@@ -131,23 +131,24 @@ void trojan(char byte)
 {
     int set;
     uint64_t *eviction_set_addr;
+    uint64_t *trojan_cache_addr;
 
-    if (byte >= 'a' && byte <= 'z') {
-        byte -= 32;
+    if (byte >= 'a' && byte <= 'z') { // from 97 to 122
+        byte -= 32; // makes sure that these characters can be matched to cache set of limit 64 sets
+        //foregoes case sensitivity
     }
     if (byte == 10 || byte == 13) { // encode a new line
-        set = 63;
+        set = 63; // automatically set index as 63 = the last possible set index
     } else if (byte >= 32 && byte < 96) {
-        set = (byte - 32);
+        set = (byte - 32); // assign sets according to byte value, limit at index 63
     } else {
         printf("pp trojan: unrecognized character %c\n", byte);
         exit(1);
     }
-    
-    /* TODO:
-     * Your attack code goes in here.
-     *
-     */  
+
+    eviction_set_addr = get_eviction_set_address(spy_array, set, 0); //gets the beginning address of the cache set in spy array
+    trojan_cache_addr = get_eviction_set_address(trojan_array, set, 0);
+    *eviction_set_addr = trojan_cache_addr; //set spy array's cache set to trojan array's dummy cache set 
 
 }
 
@@ -173,12 +174,24 @@ char spy()
     int i, max_set;
     uint64_t *eviction_set_addr;
 
-    // Probe the cache line by line and take measurements
-    for (i = 0; i < L1_NUM_SETS; i++) {
-        /* TODO:
-         * Your attack code goes in here.
-         *
-         */  
+    // Probe the cache line by line and take measurements using RDTSC
+    max_set = 0;
+    uint64_t max_penalty = 0;
+    uint64_t penalty;
+    for (i = 0; i < L1_NUM_SETS; i++) //goes through, and takes time measurements; at the set affected by the trojan, will parse manipulated cache, resulting in longer runtime
+    {
+        uint64_t before = RDTSC();
+        eviction_set_addr = get_eviction_set_address(spy_array, i, 0);
+        for(j = 1; j < ASSOCIATIVITY; j++) //probe linked lists of cache sets
+        {
+            eviction_set_addr = *eviction_set_addr;
+        }
+        penalty = RDTSC() - before;
+        if(penalty > max_penalty)
+        {
+            max_set = i;
+            max_penalty = penalty;
+        }
     }
     eviction_counts[max_set]++;
 }
@@ -203,15 +216,15 @@ int main()
             break;
         }
         for (k = 0; k < SAMPLES; k++) {
-          trojan(msg);
-          spy();
+          trojan(msg); 
+          spy(); // sets eviction counts?
         }
-        for (j = 0; j < L1_NUM_SETS; j++) {
+        for (j = 0; j < L1_NUM_SETS; j++) { // finds the set with the longest eviction time = more cache misses
             if (eviction_counts[j] > max_count) {
                 max_count = eviction_counts[j];
                 max_set = j;
             }
-            eviction_counts[j] = 0;
+            eviction_counts[j] = 0; //reset the counts
         }
         if (max_set >= 33 && max_set <= 59) {
             max_set += 32;
