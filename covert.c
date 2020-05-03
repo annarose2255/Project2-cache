@@ -240,12 +240,12 @@ int main()
         for (k = 0; k < SAMPLES; k++) {
           trojan(msg); 
           spy(); // sets eviction counts?
-        printf("i");
+        //printf("i");
         }
         for (j = 0; j < L1_NUM_SETS; j++) { // finds the set with the longest eviction time = more cache misses
             if (eviction_counts[j] > max_count) {
                 max_count = eviction_counts[j];
-                printf("a");
+                //printf("a");
                 max_set = j;
             }
             eviction_counts[j] = 0; //reset the counts
