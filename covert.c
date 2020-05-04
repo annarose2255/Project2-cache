@@ -22,7 +22,7 @@
 // Intrinsic CLFLUSH for FLUSH+RELOAD attack
 #define CLFLUSH(address) _mm_clflush(address);
 
-#define SAMPLES 10 // TODO: CONFIGURE THIS
+#define SAMPLES 10000// TODO: CONFIGURE THIS
 
 #define L1_CACHE_SIZE (32*1024)
 #define LINE_SIZE 64
@@ -101,7 +101,7 @@ uint64_t* get_eviction_set_address(uint64_t *base, int set, int way)
 void setup(uint64_t *base, int assoc) // exploits spatial and temporal locality
 {
     uint64_t i, j;
-    uint64_t *eviction_set_addr; //stores an address
+    uint64_t *eviction_set_addr = 0; //stores an address
 
     // Prime the cache set by set (i.e., prime all lines in a set) so basically at address for way-0, it stores the address for way-1; address at way-1 stores address for way-2...
     for (i = 0; i < L1_NUM_SETS; i++) { //parses from set to set
@@ -175,7 +175,7 @@ void trojan(char byte)
  * Note that you may need to serialize execution wherever
  * appropriate.
  */
-char spy()
+void spy()
 {
     int i, j, max_set;
     uint64_t *eviction_set_addr;
@@ -184,33 +184,35 @@ char spy()
 
     // Probe the cache line by line and take measurements
     uint64_t max_penalty = 0;
-    uint64_t penalty;
+    uint64_t penalty = 0;
+    
     for (i = 0; i < L1_NUM_SETS; i++) //goes through, and takes time measurements; at the set affected by the trojan, will parse manipulated cache, resulting in longer runtime
     {
-        CPUID();
-        //uint64_t before = RDTSC((uint64_t) i);
         RDTSC(start);
-        //CPUID();
-        for(j = 0; j < ASSOCIATIVITY; j++) //probe linked lists of cache sets
+        eviction_set_addr = get_eviction_set_address(spy_array, i, 0);
+       
+        for(j = 1; j < ASSOCIATIVITY; j++) //probe linked lists of cache sets
         {
+            eviction_set_addr = (uint64_t *)*eviction_set_addr;
             CPUID();
-            eviction_set_addr = get_eviction_set_address(spy_array, i, j);
-            eviction_set_addr = (uint64_t *) *eviction_set_addr;
         }
-        RDTSC(end);
-        if (end > start){
-            penalty = end - start;
-        }
-
-       // penalty = __rdtsc() - before;
+        RDTSC(end); //end timing
+        penalty = end - start; //the time of the set
         if(penalty > max_penalty)
         {
+            /* 
+            printf("<");
+            printf("%lo", max_penalty);
+            printf("/");
+            printf("%d", max_set);
+            printf(">"); */
             max_set = i;
             max_penalty = penalty;
         }
     }
-    printf("Max_set: %d \n", max_set);
-    printf("%" PRIu64 "\n", max_penalty);
+    /* printf("{}");
+    printf("%d",max_set);
+    printf("                "); */
     eviction_counts[max_set]++;
 }
 
@@ -224,7 +226,7 @@ int main()
     int max_count, max_set;
 
     // TODO: CONFIGURE THIS -- currently, 32*assoc to force eviction out of L2
-    setup(trojan_array, ASSOCIATIVITY*16);
+    setup(trojan_array, ASSOCIATIVITY*32);
 
     setup(spy_array, ASSOCIATIVITY);
     
@@ -233,10 +235,12 @@ int main()
         if (msg == EOF) {
             break;
         }
-        for (k = 0; k < SAMPLES; k++) {
+        for (k = 0; k < SAMPLES; k++) { //shoudl train the spy
           trojan(msg); 
           spy(); // sets eviction counts?
+          //printf("AAAAAAAAAAAAAAAAAAAAAAAAS");
         }
+        //printf("_______________________");
         for (j = 0; j < L1_NUM_SETS; j++) { // finds the set with the longest eviction time = more cache misses
             if (eviction_counts[j] > max_count) {
                 max_count = eviction_counts[j];
@@ -249,6 +253,8 @@ int main()
         } else if (max_set == 63) {
             max_set = -22;
         }
+       // printf("%c", 32 + max_set);
+       // printf("-");
         fprintf(out, "%c", 32 + max_set);
         max_count = max_set = 0;
     }
