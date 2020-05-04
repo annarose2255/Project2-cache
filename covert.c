@@ -22,7 +22,7 @@
 // Intrinsic CLFLUSH for FLUSH+RELOAD attack
 #define CLFLUSH(address) _mm_clflush(address);
 
-#define SAMPLES 1001// TODO: CONFIGURE THIS
+#define SAMPLES 1500// TODO: CONFIGURE THIS
 
 #define L1_CACHE_SIZE (32*1024)
 #define LINE_SIZE 64
@@ -131,7 +131,7 @@ void setup(uint64_t *base, int assoc) // exploits spatial and temporal locality
  */
 void trojan(char byte)
 {
-    int set;
+    int set = 0;
     uint64_t *eviction_set_addr;
 
     if (byte >= 'a' && byte <= 'z') { // from 97 to 122
@@ -149,17 +149,12 @@ void trojan(char byte)
 
     eviction_set_addr = get_eviction_set_address(trojan_array, set, 0);
      //eviction_set_addr = (uint64_t*) *eviction_set_addr;
-  
-    int k = 1;
-    while(k<ASSOCIATIVITY)
+    while(eviction_set_addr != NULL)
     {
-        
         //eviction_set_addr = get_eviction_set_address(trojan_array, set, k);
         eviction_set_addr = (uint64_t*) *eviction_set_addr;
-        k++;
-        
+        CPUID();
     }
-    CPUID();
       
 }
 
@@ -183,6 +178,7 @@ void trojan(char byte)
 void spy()
 {
     int i, j, max_set;
+    max_set = 0;
     uint64_t *eviction_set_addr;
     uint64_t start = 0;
     uint64_t end = 0;
@@ -198,9 +194,8 @@ void spy()
         for(j = 1; j < ASSOCIATIVITY; j++) //probe linked lists of cache sets
         {
             eviction_set_addr = (uint64_t *)*eviction_set_addr;
-            
+            CPUID();
         }
-        CPUID();
         RDTSC(end); //end timing
         penalty = end - start; //the time of the set
         if(penalty > max_penalty)
