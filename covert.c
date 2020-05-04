@@ -22,7 +22,7 @@
 // Intrinsic CLFLUSH for FLUSH+RELOAD attack
 #define CLFLUSH(address) _mm_clflush(address);
 
-#define SAMPLES 10000// TODO: CONFIGURE THIS
+#define SAMPLES 1000// TODO: CONFIGURE THIS
 
 #define L1_CACHE_SIZE (32*1024)
 #define LINE_SIZE 64
@@ -148,13 +148,19 @@ void trojan(char byte)
     }
 
     eviction_set_addr = get_eviction_set_address(trojan_array, set, 0);
+     //eviction_set_addr = (uint64_t*) *eviction_set_addr;
+  
     int k = 1;
     while(k<ASSOCIATIVITY)
     {
+        
+        //eviction_set_addr = get_eviction_set_address(trojan_array, set, k);
         eviction_set_addr = (uint64_t*) *eviction_set_addr;
         k++;
-        CPUID();
+        
     }
+        CPUID();
+      
 }
 
 /* TODO:
@@ -192,8 +198,9 @@ void spy()
         for(j = 1; j < ASSOCIATIVITY; j++) //probe linked lists of cache sets
         {
             eviction_set_addr = (uint64_t *)*eviction_set_addr;
-            CPUID();
+            
         }
+        CPUID();
         RDTSC(end); //end timing
         penalty = end - start; //the time of the set
         if(penalty > max_penalty)
