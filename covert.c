@@ -22,7 +22,7 @@
 // Intrinsic CLFLUSH for FLUSH+RELOAD attack
 #define CLFLUSH(address) _mm_clflush(address);
 
-#define SAMPLES 1 // TODO: CONFIGURE THIS
+#define SAMPLES 100 // TODO: CONFIGURE THIS
 
 #define L1_CACHE_SIZE (32*1024)
 #define LINE_SIZE 64
@@ -149,12 +149,12 @@ void trojan(char byte)
 
     eviction_set_addr = get_eviction_set_address(trojan_array, set, 0);
     int k = 1;
-    while(k<ASSOCIATIVITY)
+    while(k<=ASSOCIATIVITY)
     {
         eviction_set_addr = (uint64_t*) *eviction_set_addr;
         k++;
-        CPUID();
     }
+    CPUID();
 }
 
 /* TODO:
@@ -188,12 +188,13 @@ char spy()
     {
         //uint64_t before = RDTSC((uint64_t) i);
         RDTSC(start);
-        eviction_set_addr = get_eviction_set_address(spy_array, i, 0);
-        for(j = 1; j < ASSOCIATIVITY; j++) //probe linked lists of cache sets
+         eviction_set_addr = get_eviction_set_address(spy_array, i, 0);
+        for(j = 1; j <= ASSOCIATIVITY; j++) //probe linked lists of cache sets
         {
-            eviction_set_addr = (uint64_t *) *eviction_set_addr;
-            CPUID();
+            //*eviction_set_addr = (uint64_t)get_eviction_set_address(base, i, j); //at the memory location of the address at base, store the eviction set address
+            eviction_set_addr = (uint64_t *)*eviction_set_addr; //make the eviction_set_addr point to this new eviction set address just found
         }
+        CPUID();
         RDTSC(end);
         if (end > start){
             penalty = end - start;
@@ -221,7 +222,7 @@ int main()
     int max_count, max_set;
 
     // TODO: CONFIGURE THIS -- currently, 32*assoc to force eviction out of L2
-    setup(trojan_array, ASSOCIATIVITY);
+    setup(trojan_array, ASSOCIATIVITY*32);
 
     setup(spy_array, ASSOCIATIVITY);
     
