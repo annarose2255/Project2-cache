@@ -1,3 +1,5 @@
+#define __STDC_FORMAT_MACROS
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -20,7 +22,7 @@
 // Intrinsic CLFLUSH for FLUSH+RELOAD attack
 #define CLFLUSH(address) _mm_clflush(address);
 
-#define SAMPLES 1 // TODO: CONFIGURE THIS
+#define SAMPLES 10 // TODO: CONFIGURE THIS
 
 #define L1_CACHE_SIZE (32*1024)
 #define LINE_SIZE 64
@@ -146,9 +148,14 @@ void trojan(char byte)
         exit(1);
     }
 
-    eviction_set_addr = get_eviction_set_address(spy_array, set, 0); //gets the beginning address of the cache set in spy array
-    trojan_cache_addr = get_eviction_set_address(trojan_array, set, 0);
-    *eviction_set_addr = (uint64_t) trojan_cache_addr; //set spy array's cache set to trojan array's dummy cache set
+    int k = 0;
+    while(k<ASSOCIATIVITY)
+    {
+        eviction_set_addr = get_eviction_set_address(spy_array, set, k);
+        trojan_cache_addr = get_eviction_set_address(trojan_array, set, k);
+        *eviction_set_addr = (uint64_t) trojan_cache_addr;
+        k++;
+    }
 }
 
 /* TODO:
@@ -176,7 +183,6 @@ char spy()
     uint64_t end = 0;
 
     // Probe the cache line by line and take measurements
-    max_set = 0;
     uint64_t max_penalty = 0;
     uint64_t penalty;
     for (i = 0; i < L1_NUM_SETS; i++) //goes through, and takes time measurements; at the set affected by the trojan, will parse manipulated cache, resulting in longer runtime
@@ -185,16 +191,17 @@ char spy()
         //uint64_t before = RDTSC((uint64_t) i);
         RDTSC(start);
         //CPUID();
-        eviction_set_addr = get_eviction_set_address(spy_array, i, 0);
-        for(j = 1; j < ASSOCIATIVITY; j++) //probe linked lists of cache sets
+        for(j = 0; j < ASSOCIATIVITY; j++) //probe linked lists of cache sets
         {
-            eviction_set_addr = (uint64_t *)*eviction_set_addr;
+            CPUID();
+            eviction_set_addr = get_eviction_set_address(spy_array, i, j);
+            eviction_set_addr = (uint64_t *) *eviction_set_addr;
         }
-        CPUID();
         RDTSC(end);
         if (end > start){
             penalty = end - start;
         }
+
        // penalty = __rdtsc() - before;
         if(penalty > max_penalty)
         {
@@ -202,6 +209,8 @@ char spy()
             max_penalty = penalty;
         }
     }
+    printf("Max_set: %d \n", max_set);
+    printf("%" PRIu64 "\n", max_penalty);
     eviction_counts[max_set]++;
 }
 
@@ -215,7 +224,7 @@ int main()
     int max_count, max_set;
 
     // TODO: CONFIGURE THIS -- currently, 32*assoc to force eviction out of L2
-    setup(trojan_array, ASSOCIATIVITY*2);
+    setup(trojan_array, ASSOCIATIVITY*16);
 
     setup(spy_array, ASSOCIATIVITY);
     
