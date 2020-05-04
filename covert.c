@@ -22,7 +22,7 @@
 // Intrinsic CLFLUSH for FLUSH+RELOAD attack
 #define CLFLUSH(address) _mm_clflush(address);
 
-#define SAMPLES 1500// TODO: CONFIGURE THIS
+#define SAMPLES 20// TODO: CONFIGURE THIS
 
 #define L1_CACHE_SIZE (32*1024)
 #define LINE_SIZE 64
@@ -224,6 +224,8 @@ int main()
 
     int j, k;
     int max_count, max_set;
+    max_count = 0;
+    max_set = 0;
 
     // TODO: CONFIGURE THIS -- currently, 32*assoc to force eviction out of L2
     setup(trojan_array, ASSOCIATIVITY*32);
