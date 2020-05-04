@@ -133,7 +133,6 @@ void trojan(char byte)
 {
     int set;
     uint64_t *eviction_set_addr;
-    uint64_t *trojan_cache_addr;
 
     if (byte >= 'a' && byte <= 'z') { // from 97 to 122
         byte -= 32; // makes sure that these characters can be matched to cache set of limit 64 sets
@@ -148,13 +147,13 @@ void trojan(char byte)
         exit(1);
     }
 
-    int k = 0;
+    eviction_set_addr = get_eviction_set_address(trojan_array, set, 0);
+    int k = 1;
     while(k<ASSOCIATIVITY)
     {
-        eviction_set_addr = get_eviction_set_address(spy_array, set, k);
-        trojan_cache_addr = get_eviction_set_address(trojan_array, set, k);
-        *eviction_set_addr = (uint64_t) trojan_cache_addr;
+        eviction_set_addr = (uint64_t*) *eviction_set_addr;
         k++;
+        CPUID();
     }
 }
 
@@ -190,7 +189,6 @@ void spy()
     {
         RDTSC(start);
         eviction_set_addr = get_eviction_set_address(spy_array, i, 0);
-       
         for(j = 1; j < ASSOCIATIVITY; j++) //probe linked lists of cache sets
         {
             eviction_set_addr = (uint64_t *)*eviction_set_addr;
